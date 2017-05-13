@@ -1,4 +1,4 @@
-/* Copyright 2015 Google Inc. All Rights Reserved.
+/* Copyright 2015 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -113,9 +113,23 @@ string Status::ToString() const {
   }
 }
 
+void Status::IgnoreError() const {
+  // no-op
+}
+
 std::ostream& operator<<(std::ostream& os, const Status& x) {
   os << x.ToString();
   return os;
+}
+
+string* TfCheckOpHelperOutOfLine(const ::tensorflow::Status& v,
+                                 const char* msg) {
+  string r("Non-OK-status: ");
+  r += msg;
+  r += " status: ";
+  r += v.ToString();
+  // Leaks string but this is only to be used in a fatal error message
+  return new string(r);
 }
 
 }  // namespace tensorflow

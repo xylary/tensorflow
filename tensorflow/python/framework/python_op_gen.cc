@@ -1,4 +1,4 @@
-/* Copyright 2015 Google Inc. All Rights Reserved.
+/* Copyright 2015 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -283,7 +283,7 @@ static string GetReturns(const OpDef& op_def,
           out_names[i] = strings::StrCat("output", i);
         }
       }
-      strings::Appendf(&result, "    A tuple of `Tensor` objects (%s).\n",
+      strings::Appendf(&result, "    A tuple of `Tensor` objects (%s).\n\n",
                        str_util::Join(out_names, ", ").c_str());
       for (int i = 0; i < num_outs; ++i) {
         string desc = strings::StrCat(out_names[i], ": ");
@@ -391,7 +391,8 @@ string AttrValueToPython(const string& type, const AttrValue& value) {
   }
 }
 
-static string GetPythonOp(const OpDef& op_def, bool is_hidden, string op_name) {
+static string GetPythonOp(const OpDef& op_def, bool is_hidden,
+                          const string& op_name) {
   string result;
   // Map from attr name to the first input arg it is inferred from.
   std::unordered_map<string, string> inferred_attrs;
@@ -482,8 +483,8 @@ static string GetPythonOp(const OpDef& op_def, bool is_hidden, string op_name) {
 
   // Prepare a NamedTuple type to hold the outputs, if there are multiple
   if (num_outs > 1) {
-    const string tuple_type_prefix =
-        strings::StrCat("_", op_def.name(), "Output = collections.namedtuple(");
+    const string tuple_type_prefix = strings::StrCat(
+        "_", op_def.name(), "Output = _collections.namedtuple(");
     const string tuple_type_suffix = strings::StrCat(
         "\"", op_def.name(), "\", ", lower_op_name_outputs, ")");
     strings::Appendf(
@@ -629,10 +630,10 @@ static string GetPythonOp(const OpDef& op_def, bool is_hidden, string op_name) {
 }
 
 void GenerateLowerCaseOpName(const string& str, string* result) {
-  char joiner = '_';
-  int last_index = str.size() - 1;
+  const char joiner = '_';
+  const int last_index = str.size() - 1;
   for (int i = 0; i <= last_index; ++i) {
-    char c = str[i];
+    const char c = str[i];
     // Emit a joiner only if a previous-lower-to-now-upper or a
     // now-upper-to-next-lower transition happens.
     if (isupper(c) && (i > 0)) {
@@ -646,7 +647,7 @@ void GenerateLowerCaseOpName(const string& str, string* result) {
 
 }  // namespace
 
-string GetPythonOps(const OpList& ops, const string& hidden_ops,
+string GetPythonOps(const OpList& ops, const std::vector<string>& hidden_ops,
                     bool require_shapes) {
   string result;
   // Header
@@ -656,19 +657,19 @@ string GetPythonOps(const OpList& ops, const string& hidden_ops,
 This file is MACHINE GENERATED! Do not edit.
 """
 
-import collections
+import collections as _collections
 
-from google.protobuf import text_format
+from google.protobuf import text_format as _text_format
 
-from tensorflow.core.framework import op_def_pb2
-from tensorflow.python.framework import op_def_registry
-from tensorflow.python.framework import ops
-from tensorflow.python.ops import op_def_library
+from tensorflow.core.framework import op_def_pb2 as _op_def_pb2
 
+# Needed to trigger the call to _set_call_cpp_shape_fn.
+from tensorflow.python.framework import common_shapes as _common_shapes
 
+from tensorflow.python.framework import op_def_registry as _op_def_registry
+from tensorflow.python.framework import ops as _ops
+from tensorflow.python.framework import op_def_library as _op_def_library
 )");
-
-  std::vector<string> hidden_vec = str_util::Split(hidden_ops, ',');
 
   // We'll make a copy of ops that filters out descriptions.
   OpList cleaned_ops;
@@ -676,7 +677,7 @@ from tensorflow.python.ops import op_def_library
   out->Reserve(ops.op_size());
   for (const auto& op_def : ops.op()) {
     bool is_hidden = false;
-    for (const string& hidden : hidden_vec) {
+    for (const string& hidden : hidden_ops) {
       if (op_def.name() == hidden) {
         is_hidden = true;
         break;
@@ -699,7 +700,7 @@ from tensorflow.python.ops import op_def_library
                        GetPythonOp(op_def, is_hidden, lower_case_name));
 
     if (!require_shapes) {
-      strings::Appendf(&result, "ops.RegisterShape(\"%s\")(None)\n",
+      strings::Appendf(&result, "_ops.RegisterShape(\"%s\")(None)\n",
                        op_def.name().c_str());
     }
 
@@ -709,10 +710,10 @@ from tensorflow.python.ops import op_def_library
   }
 
   strings::Appendf(&result, R"(def _InitOpDefLibrary():
-  op_list = op_def_pb2.OpList()
-  text_format.Merge(_InitOpDefLibrary.op_list_ascii, op_list)
-  op_def_registry.register_op_list(op_list)
-  op_def_lib = op_def_library.OpDefLibrary()
+  op_list = _op_def_pb2.OpList()
+  _text_format.Merge(_InitOpDefLibrary.op_list_ascii, op_list)
+  _op_def_registry.register_op_list(op_list)
+  op_def_lib = _op_def_library.OpDefLibrary()
   op_def_lib.add_op_list(op_list)
   return op_def_lib
 
@@ -726,22 +727,16 @@ _op_def_lib = _InitOpDefLibrary()
   return result;
 }
 
-void PrintPythonOps(const OpList& ops, const string& hidden_ops,
+void PrintPythonOps(const OpList& ops, const std::vector<string>& hidden_ops,
                     bool require_shapes) {
   printf("%s", GetPythonOps(ops, hidden_ops, require_shapes).c_str());
 }
 
-string GetAllPythonOps(const char* hidden, bool require_shapes) {
-  OpList ops;
-  OpRegistry::Global()->Export(false, &ops);
-  return GetPythonOps(ops, hidden, require_shapes);
-}
-
-string GetPythonWrappers(const char* op_wrapper_buf, size_t op_wrapper_len) {
-  string op_list_str(op_wrapper_buf, op_wrapper_len);
+string GetPythonWrappers(const char* op_list_buf, size_t op_list_len) {
+  string op_list_str(op_list_buf, op_list_len);
   OpList ops;
   ops.ParseFromString(op_list_str);
-  return GetPythonOps(ops, "", false);
+  return GetPythonOps(ops, {}, false);
 }
 
 }  // namespace tensorflow

@@ -1,4 +1,4 @@
-/* Copyright 2016 Google Inc. All Rights Reserved.
+/* Copyright 2016 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,8 +49,9 @@ class MasterTest : public ::testing::Test {
     (*options.config.mutable_device_count())["CPU"] = 1;
     (*options.config.mutable_device_count())["GPU"] = 0;
     TF_CHECK_OK(test::TestCluster::MakeTestCluster(options, 2, &cluster_));
-    master_ = grpc::MasterService::NewStub(
-        NewHostPortGrpcChannel(cluster_->targets()[0]));
+    SharedGrpcChannelPtr channel_ptr;
+    TF_CHECK_OK(NewHostPortGrpcChannel(cluster_->targets()[0], &channel_ptr));
+    master_ = grpc::MasterService::NewStub(channel_ptr);
   }
 
   std::unique_ptr<test::TestCluster> cluster_;

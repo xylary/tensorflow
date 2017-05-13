@@ -1,4 +1,4 @@
-/* Copyright 2015 Google Inc. All Rights Reserved.
+/* Copyright 2015 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,12 +37,12 @@ class TEST_EventMgrHelper {
     StopPollingLoop();
   }
 
-  int queue_size() {
+  size_t queue_size() {
     mutex_lock l(em_->mu_);
     return em_->used_events_.size();
   }
 
-  int free_size() {
+  size_t free_size() {
     mutex_lock l(em_->mu_);
     return em_->free_events_.size();
   }

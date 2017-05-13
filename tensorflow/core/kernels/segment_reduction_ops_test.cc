@@ -1,4 +1,4 @@
-/* Copyright 2015 Google Inc. All Rights Reserved.
+/* Copyright 2015 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,8 +40,9 @@ limitations under the License.
 namespace tensorflow {
 
 template <typename Index>
-static void BM_SegmentReduction(int iters, string reduction, Index num_rows,
-                                Index num_cols, Index segment_size) {
+static void BM_SegmentReduction(int iters, const string& reduction,
+                                Index num_rows, Index num_cols,
+                                Index segment_size) {
   testing::StopTiming();
   std::unique_ptr<Device> device(
       DeviceFactory::NewDevice("CPU", {}, "/job:a/replica:0/task:0"));

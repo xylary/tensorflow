@@ -1,4 +1,4 @@
-/* Copyright 2015 Google Inc. All Rights Reserved.
+/* Copyright 2015 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -82,7 +82,7 @@ class GPUTracerTest : public ::testing::Test {
   }
 
  protected:
-  void ExpectFailure(Status status, error::Code code) {
+  void ExpectFailure(const Status& status, error::Code code) {
     EXPECT_FALSE(status.ok());
     if (!status.ok()) {
       LOG(INFO) << "Status message: " << status.error_message();

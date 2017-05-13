@@ -1,4 +1,4 @@
-/* Copyright 2016 Google Inc. All Rights Reserved.
+/* Copyright 2016 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,10 @@ string GetConvnetDataFormatAttrString() {
   return "data_format: { 'NHWC', 'NCHW' } = 'NHWC' ";
 }
 
+string GetConvnet3dDataFormatAttrString() {
+  return "data_format: { 'NDHWC', 'NCDHW' } = 'NDHWC' ";
+}
+
 string ToString(TensorFormat format) {
   switch (format) {
     case FORMAT_NHWC:
@@ -34,10 +38,10 @@ string ToString(TensorFormat format) {
 }
 
 bool FormatFromString(const string& format_str, TensorFormat* format) {
-  if (format_str == "NHWC") {
+  if (format_str == "NHWC" || format_str == "NDHWC") {
     *format = FORMAT_NHWC;
     return true;
-  } else if (format_str == "NCHW") {
+  } else if (format_str == "NCHW" || format_str == "NCDHW") {
     *format = FORMAT_NCHW;
     return true;
   }

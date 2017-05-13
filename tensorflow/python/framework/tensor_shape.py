@@ -1,4 +1,4 @@
-# Copyright 2015 Google Inc. All Rights Reserved.
+# Copyright 2015 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-
 """Helper classes for tensor shape inference."""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 from tensorflow.core.framework import tensor_shape_pb2
+from tensorflow.python.util import compat
 
 
 class Dimension(object):
@@ -30,6 +30,9 @@ class Dimension(object):
       self._value = None
     else:
       self._value = int(value)
+      if (not isinstance(value, compat.bytes_or_text_types) and
+          self._value != value):
+        raise ValueError("Ambiguous dimension: %s" % value)
       if self._value < 0:
         raise ValueError("Dimension %d must be >= 0" % self._value)
 
@@ -42,14 +45,20 @@ class Dimension(object):
 
   def __eq__(self, other):
     """Returns true if `other` has the same known value as this Dimension."""
-    other = as_dimension(other)
+    try:
+      other = as_dimension(other)
+    except (TypeError, ValueError):
+      return NotImplemented
     if self._value is None or other.value is None:
       return None
     return self._value == other.value
 
   def __ne__(self, other):
     """Returns true if `other` has a different known value from `self`."""
-    other = as_dimension(other)
+    try:
+      other = as_dimension(other)
+    except (TypeError, ValueError):
+      return NotImplemented
     if self._value is None or other.value is None:
       return None
     return self._value != other.value
@@ -79,9 +88,8 @@ class Dimension(object):
       True if this Dimension and `other` are compatible.
     """
     other = as_dimension(other)
-    return (self._value is None
-            or other.value is None
-            or self._value == other.value)
+    return (self._value is None or other.value is None or
+            self._value == other.value)
 
   def assert_is_compatible_with(self, other):
     """Raises an exception if `other` is not compatible with this Dimension.
@@ -94,19 +102,21 @@ class Dimension(object):
         is_compatible_with).
     """
     if not self.is_compatible_with(other):
-      raise ValueError("Dimensions %s and %s are not compatible"
-                       % (self, other))
+      raise ValueError("Dimensions %s and %s are not compatible" % (self,
+                                                                    other))
 
   def merge_with(self, other):
     """Returns a Dimension that combines the information in `self` and `other`.
 
     Dimensions are combined as follows:
 
+    ```python
         Dimension(n)   .merge_with(Dimension(n))    == Dimension(n)
         Dimension(n)   .merge_with(Dimension(None)) == Dimension(n)
         Dimension(None).merge_with(Dimension(n))    == Dimension(n)
         Dimension(None).merge_with(Dimension(None)) == Dimension(None)
         Dimension(n)   .merge_with(Dimension(m)) raises ValueError for n != m
+    ```
 
     Args:
       other: Another Dimension.
@@ -175,16 +185,18 @@ class Dimension(object):
 
     Dimensions are summed as follows:
 
+    ```
       Dimension(m)    * Dimension(n)    == Dimension(m * n)
       Dimension(m)    * Dimension(None) == Dimension(None)
       Dimension(None) * Dimension(n)    == Dimension(None)
       Dimension(None) * Dimension(None) == Dimension(None)
+    ```
 
     Args:
       other: Another Dimension.
 
     Returns:
-      A Dimension whose value is the sum of `self` and `other`.
+      A Dimension whose value is the product of `self` and `other`.
     """
     other = as_dimension(other)
     if self._value is None or other.value is None:
@@ -371,37 +383,17 @@ class TensorShape(object):
   `Tensor`. It may be one of the following:
 
   * *Fully-known shape:* has a known number of dimensions and a known size
-    for each dimension.
+    for each dimension. e.g. `TensorShape([16, 256])`
   * *Partially-known shape:* has a known number of dimensions, and an unknown
-    size for one or more dimension.
+    size for one or more dimension. e.g. `TensorShape([None, 256])`
   * *Unknown shape:* has an unknown number of dimensions, and an unknown
-    size in all dimensions.
+    size in all dimensions. e.g. `TensorShape(None)`
 
   If a tensor is produced by an operation of type `"Foo"`, its shape
   may be inferred if there is a registered shape function for
-  `"Foo"`. See [`tf.RegisterShape()`](../../api_docs/python/framework.md#RegisterShape)
-  for details of shape
-  functions and how to register them. Alternatively, the shape may be set
-  explicitly using [`Tensor.set_shape()`](../../api_docs/python/framework.md#Tensor.set_shape).
-
-  @@merge_with
-  @@concatenate
-
-  @@ndims
-  @@dims
-  @@as_list
-  @@as_proto
-  @@is_compatible_with
-  @@is_fully_defined
-
-  @@with_rank
-  @@with_rank_at_least
-  @@with_rank_at_most
-
-  @@assert_has_rank
-  @@assert_same_rank
-  @@assert_is_compatible_with
-  @@assert_is_fully_defined
+  `"Foo"`. See @{$adding_an_op#shape-functions-in-c$`Shape functions in C++`}
+  for details of shape functions and how to register them. Alternatively,
+  the shape may be set explicitly using @{tf.Tensor.set_shape}.
   """
 
   def __init__(self, dims):
@@ -410,10 +402,16 @@ class TensorShape(object):
     Args:
       dims: A list of Dimensions, or None if the shape is unspecified.
         DEPRECATED: A single integer is treated as a singleton list.
+
+    Raises:
+      TypeError: If dims cannot be converted to a list of dimensions.
     """
     # TODO(irving): Eliminate the single integer special case.
     if dims is None:
       self._dims = None
+    elif isinstance(dims, compat.bytes_or_text_types):
+      raise TypeError("A string has ambiguous TensorShape, please wrap in a "
+                      "list or convert to an int: %s" % dims)
     elif isinstance(dims, tensor_shape_pb2.TensorShapeProto):
       if dims.unknown_rank:
         self._dims = None
@@ -421,7 +419,10 @@ class TensorShape(object):
         self._dims = [
             # Protos store variable-size dimensions as -1
             as_dimension(dim.size if dim.size != -1 else None)
-            for dim in dims.dim]
+            for dim in dims.dim
+        ]
+    elif isinstance(dims, TensorShape):
+      self._dims = dims.dims
     else:
       try:
         dims_iter = iter(dims)
@@ -469,6 +470,13 @@ class TensorShape(object):
   # Python 3 wants __bool__, Python 2.7 wants __nonzero__
   __nonzero__ = __bool__
 
+  def __iter__(self):
+    """Returns `self.dims` if the rank is known, otherwise raises ValueError."""
+    if self._dims is None:
+      raise ValueError("Cannot iterate over a shape with unknown rank.")
+    else:
+      return iter(self._dims)
+
   def __getitem__(self, key):
     """Returns the value of a dimension or a shape, depending on the key.
 
@@ -509,7 +517,7 @@ class TensorShape(object):
           # suffixes of otherwise unknown shapes.
           return unknown_shape()
         else:
-          return unknown_shape(ndims=stop-start)
+          return unknown_shape(ndims=stop - start)
       else:
         return Dimension(None)
 
@@ -550,8 +558,7 @@ class TensorShape(object):
           new_dims.append(dim.merge_with(other[i]))
         return TensorShape(new_dims)
       except ValueError:
-        raise ValueError("Shapes %s and %s are not compatible" %
-                         (self, other))
+        raise ValueError("Shapes %s and %s are not compatible" % (self, other))
 
   def concatenate(self, other):
     """Returns the concatenation of the dimension in `self` and `other`.
@@ -589,8 +596,8 @@ class TensorShape(object):
     other = as_shape(other)
     if self.ndims is not None and other.ndims is not None:
       if self.ndims != other.ndims:
-        raise ValueError(
-            "Shapes %s and %s must have the same rank" % (self, other))
+        raise ValueError("Shapes %s and %s must have the same rank" % (self,
+                                                                       other))
 
   def assert_has_rank(self, rank):
     """Raises an exception if `self` is not compatible with the given `rank`.
@@ -726,8 +733,8 @@ class TensorShape(object):
 
   def is_fully_defined(self):
     """Returns True iff `self` is fully defined in every dimension."""
-    return (self._dims is not None
-            and all(dim.value is not None for dim in self._dims))
+    return (self._dims is not None and all(dim.value is not None
+                                           for dim in self._dims))
 
   def assert_is_fully_defined(self):
     """Raises an exception if `self` is not fully defined in every dimension.
@@ -739,11 +746,16 @@ class TensorShape(object):
       raise ValueError("Shape %s is not fully defined" % self)
 
   def as_list(self):
-    """Returns a list of integers or None for each dimension.
+    """Returns a list of integers or `None` for each dimension.
 
     Returns:
-      A list of integers or None for each dimension.
+      A list of integers or `None` for each dimension.
+
+    Raises:
+      ValueError: If `self` is an unknown shape with an unknown rank.
     """
+    if self._dims is None:
+      raise ValueError("as_list() is not defined on an unknown TensorShape.")
     return [dim.value for dim in self._dims]
 
   def as_proto(self):
@@ -752,18 +764,25 @@ class TensorShape(object):
       return tensor_shape_pb2.TensorShapeProto(unknown_rank=True)
     else:
       return tensor_shape_pb2.TensorShapeProto(dim=[
-          tensor_shape_pb2.TensorShapeProto.Dim(
-              size=-1 if d.value is None else d.value)
-          for d in self._dims])
+          tensor_shape_pb2.TensorShapeProto.Dim(size=-1
+                                                if d.value is None else d.value)
+          for d in self._dims
+      ])
 
   def __eq__(self, other):
     """Returns True if `self` is equivalent to `other`."""
-    other = as_shape(other)
+    try:
+      other = as_shape(other)
+    except TypeError:
+      return NotImplemented
     return self._dims == other.dims
 
   def __ne__(self, other):
     """Returns True if `self` is known to be different from `other`."""
-    other = as_shape(other)
+    try:
+      other = as_shape(other)
+    except TypeError:
+      return NotImplemented
     if self.ndims is None or other.ndims is None:
       raise ValueError("The inequality of unknown TensorShapes is undefined.")
     if self.ndims != other.ndims:

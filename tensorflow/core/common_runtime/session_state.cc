@@ -1,4 +1,4 @@
-/* Copyright 2015 Google Inc. All Rights Reserved.
+/* Copyright 2015 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ limitations under the License.
 #include "tensorflow/core/graph/tensor_id.h"
 
 namespace tensorflow {
+
+const char* SessionState::kTensorHandleResourceTypeName = "TensorHandle";
 
 Status SessionState::GetTensor(const string& handle, Tensor* tensor) {
   mutex_lock l(state_lock_);

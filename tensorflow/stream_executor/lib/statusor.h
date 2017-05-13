@@ -1,4 +1,4 @@
-/* Copyright 2015 Google Inc. All Rights Reserved.
+/* Copyright 2015 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -135,7 +135,7 @@ class StatusOr {
   // operators, to support move-only types and avoid unnecessary copying.
   StatusOr(T&& value);  // NOLINT
 
-  // Move conversion operator to avoid unecessary copy.
+  // Move conversion operator to avoid unnecessary copy.
   // T must be assignable from U.
   // Not marked with explicit so the implicit conversion can happen.
   template <typename U>
@@ -202,13 +202,13 @@ StatusOr<T>::StatusOr(const T& value)
 
 template <typename T>
 const T& StatusOr<T>::ValueOrDie() const {
-  assert(status_.ok());
+  TF_CHECK_OK(status_);
   return value_;
 }
 
 template <typename T>
 T StatusOr<T>::ConsumeValueOrDie() {
-  assert(status_.ok());
+  TF_CHECK_OK(status_);
   return std::move(value_);
 }
 

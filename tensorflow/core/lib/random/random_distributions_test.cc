@@ -1,4 +1,4 @@
-/* Copyright 2015 Google Inc. All Rights Reserved.
+/* Copyright 2015 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -70,7 +70,7 @@ void FillRandomsWithSingles(PhiloxRandom gen,
 //   z_limit: the maximum z-test we would consider the test to pass;
 template <typename T>
 bool CheckSamplesMoments(const std::vector<T>& samples,
-                         std::function<double(int)> theoretical_moments,
+                         const std::function<double(int)>& theoretical_moments,
                          int max_moments, int stride, T z_limit) {
   const T* const samples_data = &samples[0];
   const int samples_size = samples.size();
